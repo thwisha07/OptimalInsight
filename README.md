@@ -1,56 +1,27 @@
-# OptimalInsight — MVP scaffold
+# Redis and worker setup
 
-This repository contains a minimal scaffold for the OptimalInsight portal:
-- Next.js (React + TypeScript)
-- SQLite (Prisma) for metadata (easy local setup, no Docker)
-- Local filesystem uploads for development (easy viewing). You can switch to S3 in production.
-- Basic auth using NextAuth (Credentials provider) with a seeded admin user
-- File upload endpoint that supports large files via streaming (formidable)
-- Per-system dashboard and simple PDF report generation (pdfkit)
+This project now includes a background worker (BullMQ + Redis) that processes files after upload (virus scanning stub, metadata extraction stub, then marks the file ready).
 
-Quick start (local, no Docker)
+Prerequisites
+- Redis: install locally or use a managed Redis service.
+  - Local quick start (macOS with Homebrew): brew install redis && redis-server
+  - Docker (if you change your mind): docker run -p 6379:6379 redis
+- Ensure REDIS_URL is set if not running on localhost:6379. Example: REDIS_URL=redis://localhost:6379
 
-1. Install dependencies
+How it works
+- After a successful multipart upload completes, the server creates a File record with status `processing` and enqueues a job on the `file-processing` queue.
+- The worker (workers/fileProcessor.ts) consumes jobs from that queue, performs a stub virus scan and metadata extraction, and updates the file record to status `ready` with some example metadata.
 
-   npm install
+Run the worker
 
-2. Create .env (see .env.example)
+1. Ensure Redis is running and available at REDIS_URL (or default redis://localhost:6379).
+2. From the project root run:
 
-   cp .env.example .env
-   # Edit .env as needed. At minimum set NEXTAUTH_SECRET. DATABASE_URL defaults to SQLite.
+   npm run worker
 
-3. Generate Prisma client & run migrations
+3. The worker logs will show processing progress.
 
-   npx prisma generate
-   npx prisma migrate dev --name init
-
-4. Seed an admin user (optional)
-
-   npm run seed
-
-   The seed script will create an admin user with the email `admin@example.com` and the password printed in the console.
-
-5. Run dev server
-
-   npm run dev
-
-6. Open http://localhost:3000
-
-Notes & next steps
-
-- This scaffold stores uploaded files in the `uploads/` folder for easy viewing. For production you should use S3 or another object store and presigned multipart uploads.
-- The PDF report generator is a simple example using pdfkit; you can replace it with Puppeteer for HTML-based reports if you need precise styling.
-- Security: this scaffold includes a simple credentials-based auth. For production, use an enterprise IdP (SAML/OIDC) and enable MFA.
-
-Files of interest
-
-- prisma/schema.prisma — DB models
-- prisma/seed.ts — seed script that creates an admin user and one example system
-- pages/ — Next.js pages and API routes
-  - pages/api/files/upload.ts — file upload handler
-  - pages/api/reports/generate.ts — PDF generator
-  - pages/api/systems.ts — systems CRUD
-  - pages/api/auth/[...nextauth].ts — auth
-- lib/prisma.ts — Prisma client
-
-If you want, I can extend the scaffold to add S3 presigned uploads, background workers, or prettier PDF reports. Say which feature to add next and I'll implement it.
+TODOs for production
+- Replace the virus-scan stub with a real scanner (ClamAV or a commercial scanning service). If infected files are found, mark the DB record as `quarantined` and move the S3 object to a quarantine bucket or delete it.
+- Implement metadata extraction (PDF text extraction, image thumbnails, geospatial indexing) and persist useful searchable fields to `metadata`.
+- Add retry and backoff policies for job failures and monitor job queue health.
