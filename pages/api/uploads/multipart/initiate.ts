@@ -1,5 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { S3Client, CreateMultipartUploadCommand } from '@aws-sdk/client-s3'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../auth/[...nextauth]'
+import { prisma } from '../../../../lib/prisma'
 
 function getS3Client(){
   const { AWS_REGION, S3_ENDPOINT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
@@ -16,5 +19,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cmd = new CreateMultipartUploadCommand({ Bucket: process.env.S3_BUCKET, Key: key, ContentType: contentType })
   const out = await s3.send(cmd)
   const uploadId = out.UploadId
-  res.json({ multipart: true, key, uploadId })
+
+  // create server-side session if user authenticated
+  let sessionRecord = null
+  try {
+    const session = await getServerSession(req, res, authOptions)
+    const userId = session?.user?.id || null
+    sessionRecord = await prisma.uploadSession.create({ data: { userId, systemId, filename, key, uploadId: uploadId as string, size: Number(req.body.size || 0), contentType: contentType || null } })
+  } catch (err) {
+    // ignore prisma errors, session optional
+    console.warn('could not create upload session', err)
+  }
+
+  res.json({ multipart: true, key, uploadId, sessionId: sessionRecord?.id || null })
 }

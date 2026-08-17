@@ -1,5 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { S3Client, AbortMultipartUploadCommand } from '@aws-sdk/client-s3'
+import { prisma } from '../../../../../lib/prisma'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '../../../auth/[...nextauth]'
 
 function getS3Client(){
   const { AWS_REGION, S3_ENDPOINT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
@@ -15,6 +18,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!s3) return res.status(500).json({ error: 'S3 not configured' })
   try {
     await s3.send(new AbortMultipartUploadCommand({ Bucket: process.env.S3_BUCKET, Key: key, UploadId: uploadId }))
+    // if session exists, delete
+    if (req.body.sessionId){
+      try { await prisma.uploadSession.delete({ where: { id: req.body.sessionId } }) } catch(e){ /* ignore */ }
+    }
     res.json({ aborted: true })
   } catch (err) {
     console.error('abort error', err)

@@ -36,3 +36,17 @@ model File {
   metadata    Json?
   uploadedAt  DateTime @default(now())
 }
+
+model UploadSession {
+  id          String   @id @default(cuid())
+  userId      String?
+  systemId    String
+  filename    String
+  key         String
+  uploadId    String
+  size        Int
+  contentType String?
+  parts       Json?    // { partNumber: { etag, uploadedAt } }
+  status      String   @default("initiated")
+  createdAt   DateTime @default(now())
+}

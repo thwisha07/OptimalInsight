@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { prisma } from '../../../../../lib/prisma'
 
 function getS3Client(){
   const { AWS_REGION, S3_ENDPOINT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = process.env
@@ -10,7 +11,7 @@ function getS3Client(){
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse){
   if (req.method !== 'POST') return res.status(405).end()
-  const { key, uploadId, partNumber } = req.body
+  const { key, uploadId, partNumber, sessionId } = req.body
   if (!key || !uploadId || !partNumber) return res.status(400).json({ error: 'missing fields' })
   const s3 = getS3Client()
   if (!s3) return res.status(500).json({ error: 'S3 not configured' })
